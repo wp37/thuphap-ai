@@ -1,0 +1,7 @@
+{
+  "name": "Remix: vkt NANG CAP Thư Pháp Đại Sư",
+  "description": "An AI-powered web application for generating East Asian Calligraphy art. Users can type words and choose mediums like porcelain, jade, rock carving or scrolls to generate magnificent calligraphy.",
+  "requestFramePermissions": [],
+  "hideCodeAssistant": true,
+  "majorCapabilities": []
+}
