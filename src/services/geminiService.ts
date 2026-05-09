@@ -1,6 +1,31 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const USER_API_KEY_STORAGE = 'tuai-user-api-key';
+
+const getApiKey = (): string => {
+  const userKey = localStorage.getItem(USER_API_KEY_STORAGE);
+  if (userKey && userKey.trim().startsWith('AIza')) {
+    return userKey.trim();
+  }
+  return process.env.GEMINI_API_KEY || '';
+};
+
+let aiInstance: GoogleGenAI | null = null;
+
+const getAi = (): GoogleGenAI => {
+  if (!aiInstance) {
+    const key = getApiKey();
+    if (!key) {
+      throw new Error('Không tìm thấy Gemini API Key. Vui lòng nhập API Key trong cài đặt.');
+    }
+    aiInstance = new GoogleGenAI({ apiKey: key });
+  }
+  return aiInstance;
+};
+
+export const resetAiInstance = () => {
+  aiInstance = null;
+};
 
 export class ApiError extends Error {
   constructor(message: string) {
@@ -177,7 +202,7 @@ export const generateCalligraphyImage = async (
                 });
             }
             
-            const response = await ai.models.generateContent({
+            const response = await getAi().models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts },
                 config: {
@@ -202,7 +227,7 @@ export const generateImageFromText = async (prompt: string, aspectRatio: AspectR
     const enhancedPrompt = `${prompt}, 8k resolution, photorealistic, highly detailed, sharp focus, professional photography. No text or watermarks.`;
     const imageUrls: string[] = [];
     for (let i = 0; i < numberOfImages; i++) {
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: enhancedPrompt }] },
             config: {
@@ -224,7 +249,7 @@ export const generateImageFromText = async (prompt: string, aspectRatio: AspectR
 
 export const analyzeImage = async (base64ImageData: string, mimeType: string, prompt: string): Promise<any> => {
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
                 parts: [
@@ -245,7 +270,7 @@ export const analyzeImage = async (base64ImageData: string, mimeType: string, pr
 export const editImageWithText = async (base64ImageData: string, mimeType: string, prompt: string, aspectRatio?: AspectRatio): Promise<string> => {
     try {
         const enhancedPrompt = `${prompt}. High quality, photorealistic, sharp details, professional. No text or watermarks.`;
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
                 parts: [
@@ -302,7 +327,7 @@ export const generatePromptFromImage = async (base64ImageData: string, mimeType:
         let textPrompt = `Analyze this image and create a highly creative, detailed video prompt for a 5-10 second clip.`;
         if (userWish?.trim()) textPrompt += ` Incorporate user wish: "${userWish.trim()}".`;
         textPrompt += ' Provide result as JSON with keys "vi" and "en".';
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: {
                 parts: [
@@ -335,7 +360,7 @@ export const suggestBackground = async (model: ImageInput | null, clothing: Imag
         if (clothing) parts.push({ inlineData: { data: clothing.base64, mimeType: clothing.mimeType } });
         if (accessory) parts.push({ inlineData: { data: accessory.base64, mimeType: accessory.mimeType } });
         parts.push({text: "Suggest a professional photography background for this fashion item/model/product. Return only one line in Vietnamese."});
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: { parts },
         });
@@ -355,7 +380,7 @@ export const generateAdCreative = async (model: ImageInput | null, clothing: Ima
         if (accessory) parts.push({ inlineData: { data: accessory.base64, mimeType: accessory.mimeType } });
         parts.push({ text: promptText });
         const processOne = async () => {
-            const res = await ai.models.generateContent({
+            const res = await getAi().models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts },
                 config: {
@@ -379,7 +404,7 @@ export const generateProductPhotoshoot = async (productImage: ImageInput, finalP
     try {
         const imageUrls: string[] = [];
         for (let i = 0; i < numberOfImages; i++) {
-            const response = await ai.models.generateContent({
+            const response = await getAi().models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: {
                     parts: [
@@ -410,7 +435,7 @@ export const dressOnModel = async (clothingImage: ImageInput, modelImage: ImageI
     try {
         const autoFitInstruction = autoFit ? "IMPORTANT: Tailored fit." : "";
         const prompt = `Dress the model. ${autoFitInstruction} ${userPrompt}. Aspect ratio ${aspectRatio}.`;
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
                 parts: [
@@ -442,7 +467,7 @@ export const generateProductPackaging = async (productImage: ImageInput, coverIm
             const parts: any[] = [{ inlineData: { data: productImage.base64, mimeType: productImage.mimeType } }];
             if (coverImage) parts.push({ inlineData: { data: coverImage.base64, mimeType: coverImage.mimeType } });
             parts.push({ text: finalPrompt });
-            const response = await ai.models.generateContent({
+            const response = await getAi().models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts },
                 config: {
@@ -464,7 +489,7 @@ export const generateVideoScript = async (images: (ImageInput | null)[], product
         const parts: any[] = [];
         images.filter(img => img).forEach(img => parts.push({ inlineData: { data: img!.base64, mimeType: img!.mimeType } }));
         parts.push({ text: `Create a video script for ${productName}. Tone: ${brandTone}. CTA: ${cta}.` });
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: { parts },
             config: {
@@ -503,7 +528,7 @@ export const generateImageForScene = async (visuals: string, brandTone: string, 
         const parts: any[] = [];
         if (productImage) parts.push({ inlineData: { data: productImage.base64, mimeType: productImage.mimeType } });
         parts.push({ text: prompt });
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts },
             config: {
@@ -520,7 +545,7 @@ export const generateImageForScene = async (visuals: string, brandTone: string, 
 
 export const generateAdCopyFromScript = async (script: VideoScript): Promise<string> => {
     try {
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: `Write a social media ad copy in Vietnamese: ${script.title}.`,
         });
@@ -533,7 +558,7 @@ export const generateAdCopyFromScript = async (script: VideoScript): Promise<str
 export const generateFacebookPost = async (imageDetail: string, mood: string, wordCount: number): Promise<{ title: string; content: string }> => {
     try {
         const prompt = `Dựa vào mô tả: "${imageDetail}". Tâm trạng: ${mood}. Độ dài: ${wordCount} từ. Trả về JSON: title, content.`;
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: { parts: [{ text: prompt }] },
             config: {
@@ -595,7 +620,7 @@ Output ONLY a valid JSON object with this structure:
 }
         `.trim();
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
                 parts: [
@@ -642,7 +667,7 @@ export const swapCharacter = async (backgroundImg: ImageInput, characterImg: Ima
             `.trim();
         }
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
                 parts: [
@@ -675,18 +700,18 @@ export const startVideoGeneration = async (prompt: string, style: VideoStyle, as
             config: { resolution: '720p', aspectRatio: aspectRatio, numberOfVideos: 1 } 
         };
         if (image) config.image = { imageBytes: image.base64, mimeType: image.mimeType };
-        return await ai.models.generateVideos(config);
+        return await getAi().models.generateVideos(config);
     } catch (error) {
         return handleError(error, 'bắt đầu tạo video');
     }
 };
 
 export const pollVideoGeneration = async (operation: any) => {
-    return await ai.operations.getVideosOperation({ operation });
+    return await getAi().operations.getVideosOperation({ operation });
 };
 
 export const translateTextToEnglish = async (text: string): Promise<string> => {
-    const response = await ai.models.generateContent({ model: 'gemini-3.1-pro-preview', contents: `Translate to English: ${text}` });
+    const response = await getAi().models.generateContent({ model: 'gemini-3.1-pro-preview', contents: `Translate to English: ${text}` });
     return response.text.trim();
 };
 
@@ -697,7 +722,7 @@ export const generateSpeechFromText = async (text: string, voiceName: string, pe
         const pitchText = pitch ? (pitch > 2 ? "cao" : pitch < -2 ? "trầm" : "tự nhiên") : "tự nhiên";
 
         if (isChild) {
-            const response = await ai.models.generateContent({ 
+            const response = await getAi().models.generateContent({ 
                 model: "gemini-3-flash-preview",
                 contents: [{ parts: [{ text: `Đọc: "${text}"` }] }],
                 config: {
@@ -710,7 +735,7 @@ export const generateSpeechFromText = async (text: string, voiceName: string, pe
             return audioData;
         }
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text: `Đọc: "${text}"` }] }],
             config: {

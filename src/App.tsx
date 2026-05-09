@@ -5,8 +5,9 @@ import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
 import * as authService from './services/authService';
 import ImagePreviewModal from './components/ImagePreviewModal';
+import ApiKeyModal from './components/ApiKeyModal';
 import { LanguageProvider, useLanguage } from './i18n';
-import { LoaderIcon } from './components/Icons';
+import { LoaderIcon, KeyIcon } from './components/Icons';
 
 const CalligraphyGenerator = lazy(() => import('./pages/CalligraphyGenerator'));
 const CharacterSwapper = lazy(() => import('./pages/CharacterSwapper'));
@@ -59,6 +60,7 @@ const AppContent: React.FC = () => {
     return 'calligraphy';
   });
 
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [previewImage, setPreviewImage] = useState<PreviewState>(null);
   const isAdmin = true;
   
@@ -140,6 +142,18 @@ const AppContent: React.FC = () => {
       </div>
 
       {previewImage && <ImagePreviewModal isOpen={!!previewImage} onClose={handleClosePreview} imageUrl={previewImage.url} onDownload={previewImage.onDownload} onRefresh={previewImage.onRefresh} />}
+
+      <ApiKeyModal isOpen={showApiKeyModal} onClose={() => setShowApiKeyModal(false)} />
+
+      {/* Floating API Key Button */}
+      <button
+        onClick={() => setShowApiKeyModal(true)}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700 hover:border-[#D4AF37]/50 rounded-2xl shadow-2xl transition-all hover:scale-105 group"
+        title="Cài đặt API Key"
+      >
+        <KeyIcon className="w-4 h-4 text-[#D4AF37] group-hover:animate-pulse" />
+        <span className="text-xs font-bold text-zinc-300 group-hover:text-white">API Key</span>
+      </button>
     </div>
   );
 };
